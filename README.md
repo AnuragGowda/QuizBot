@@ -1,3 +1,3 @@
 # QuizBot
- A bot that helps people practice Quizbowl
  **WIP**
+A bot that helps people practice Quizbowl
