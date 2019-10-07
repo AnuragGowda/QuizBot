@@ -9,8 +9,10 @@ startWords = ['ST']+['Start_'+i for i in fullTournamentWords]
 joinWords = ['JT']+['Join_'+i for i in fullTournamentWords]
 endWords = ['ET']+['End_'+i for i in fullTournamentWords]
 leaderWords = ['LB']
+createWords = ['CT']
 
-def getDifferentNames(commandList, command, special=None): # In other words a dumb thing I made thats dumb
+def getDifferentNames(commandList, command, special=None): 
+    # Fix this, command isn't used when not special...
     if special:
         return commandList+[i.lower() for i in commandList]+[i.upper() for i in commandList if i.upper() not in \
             commandList]+[i+special for i in commandList]+[i.lower()+'!' for i in commandList]+[command.lower(), 
@@ -78,6 +80,7 @@ class Tournament:
     
     def add_player(self, player):
         self.players.append(player)
+        print(player)
     
     def add_team(self, team):
         for player in team.players:
@@ -96,6 +99,12 @@ class Tournament:
     def create_team(self, name, player):
         if player.in_team:
             return "You are already in a team, please leave the team first" 
+    
+    def rtn_player(self, name):
+        print(len(self.players))
+        for player in self.players:
+            if player.name == name:
+                return player
 
     @property    
     def leaderboard(self):

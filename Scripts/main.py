@@ -59,6 +59,20 @@ async def leaderboard(ctx):
     else:
         await ctx.send(runningTournament.leaderboard)
 
+@bot.command(name='Create_Team', help='Creates a team for a tournament', aliases=getDifferentNames(createWords, 'create_team'))
+async def create(ctx):
+    global runningTournament
+    if not runningTournament:
+        await ctx.send('A tournament hasn\'t started yet!')
+    else:
+        if ctx.message.content.rfind('-') != -1:
+            runningTournament.add_team(Team(ctx.message.content[ctx.message.content.rfind('-')+1:].split(' '), runningTournament.rtn_player(ctx.message.author)))
+            await ctx.send('Creating a team with the name of: '+ctx.message.content[ctx.message.content.rfind('-')+1:].split(' '))
+        else:
+            await ctx.send('Please specify a name by typing -team_name after the Create_Team call')
+        
+
+
 @bot.event
 async def on_ready():
     print(bot.user.name + ' has connected to Discord!')
