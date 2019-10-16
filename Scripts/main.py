@@ -1,12 +1,15 @@
+# Import Files
 import os
 import random
 from discord.ext.commands import Bot
 from dotenv import load_dotenv
 from setup import *
 
+# Load token from .env file
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 
+# Set up the bot
 bot = Bot(command_prefix=['QuizBot ', 'qb ', 'QB '])
 
 @bot.command(name='Hello', help='Says hello to the invoker', aliases=getDifferentNames(helloWords, 'Hello', '!'))
@@ -66,15 +69,66 @@ async def create(ctx):
         await ctx.send('A tournament hasn\'t started yet!')
     else:
         if ctx.message.content.rfind('-') != -1:
-            runningTournament.add_team(Team(ctx.message.content[ctx.message.content.rfind('-')+1:].split(' '), runningTournament.rtn_player(ctx.message.author)))
-            await ctx.send('Creating a team with the name of: '+ctx.message.content[ctx.message.content.rfind('-')+1:].split(' '))
+            for team in runningTournament.teams:
+                if team.name == ctx.message.content[ctx.message.content.rfind('-')+1:]:
+                    return await ctx.send('There is already a team with that name!') 
+            runningTournament.add_team(Team(ctx.message.content[ctx.message.content.rfind('-')+1:], runningTournament.rtn_player(str(ctx.message.author))))
+            await ctx.send('Creating a team with the name of: '+ctx.message.content[ctx.message.content.rfind('-')+1:])
         else:
             await ctx.send('Please specify a name by typing -team_name after the Create_Team call')
-        
 
+@bot.command(name='Leave_Team', help='Leaves a tournament team', aliases=['leave'])
+async def leave(ctx):
+    if not runningTournament: 
+        await ctx.send('A tournament hasn\'t started yet!')
+    else:
+        if runningTournament.rtn_player(str(ctx.message.author)).in_team == False:
+            await ctx.send('You aren\'t in a team!')
+        else:
+            await ctx.send(runningTournament.rtn_player(str(ctx.message.author)).leave_team(runningTournament))
+
+@bot.command(name='Get_Pos', help='Gets a player or team position in a tournament', aliases=['gp'])
+async def myPos(ctx):
+    global runningTournament
+    if not runningTournament:
+        await ctx.send('A tournament hasn\'t started yet!')
+    else:
+        if ctx.message.content.rfind('-') != -1:
+            pass
+        else:
+            await ctx.send('Please specify a name by typing -team,team_name or -player,player_name after the Get_Pos call')
+    
+@bot.command(name='SUPER_HELP', help='You should run this command if you need help!', aliases=['h'])
+async def hlp(ctx):
+    helpString = \
+        '\'\'\'\t\t**Commands and Usage for QuizBot**\n\n'+\
+        '**Command-Prefix**: *(This is not an actual command)* To \"call\" the bot, either use QuizBot, qb or QB, each followed by a space character. This is used BEFORE EVERY COMMAND that is listed below\n\n\n'+\
+        'For the following commands, to get the full alias (which is an alternate way to use the command, for example, instead of typing qb Hello, you may type qb hi!) list (and a brief description), type the Command-Prefix (QuizBot, qb, QB) followed by help and then a space and the command/keyword (ex. qb help Hello) you want the list for\n\n'+\
+        'ADMIN and CREATOR commands: ADMIN commands are only useable for those who have the discord role \'ADMIN\' in a server that has the bot. CREATOR command is meant for the person who set up the bot.\n\n\n'+\
+        '**Hello**: Says hello, or a version of hello (Howdy, Sup, Hi) to the person who invoked the call in the format: *Command-Prefix* Hello *username with 4 digits*\n\n'+\
+        '**Start_Tournament**: *(This is an ADMIN command)* Starts a tournament, as the name implies, the format of this command is *Command-Prefix* Start_Tournament -**category** where category is a QuizBowl category. The supported categories for this bot are <<INPUT THE SUPPORTED CATEGORIES HERE (TODO)>>. A tournament is something that allows players to join, form teams and compete against each other, allowing them to also be able to veiw a leaderbaord and thier position in the overall tournament. There can only be ONE tournament per channel that the bot is in.\n\n'+\
+        '**Join_Tournament**: This allows any user to join the tournament in progress if a tournament is in progress.\n\n'+\
+        '**End_Tournament**: *(This is an ADMIN command)* This ends the tournament that is currently in progress, if one was in progress and displays the final leaderboard for that tournament.\n\n'+\
+        '**Leaderbaord**: This allows any user to display the current tournament standings, if a tournament is running\n\n'+\
+        '**Create_Team**:\n\n'+\
+        '**Leave_Team**:\n\n'+\
+        '**Get_Pos**:\n\n'+\
+        '**Tossup**: TODO\n\n\'\'\''+\
+        '**EVAL**: \'\'\'*(This is a CREATOR command)*\n\n'+\
+        '\nOVERALL TODO: Tossups, generate questions, +- points after answering a question in a tournament, buzzing, display questions, there may be some bugs too?\'\'\''
+    await ctx.send(helpString[:2000])
+    await ctx.send(helpString[2000:])
+
+@bot.command(name='EVAL', help='For bot tests (CREATOR ONLY)', aliases=['e'])
+async def evaluate(ctx):
+    if str(ctx.message.author.id) == '486703741257383937':
+        await ctx.send(eval(ctx.message.content[ctx.message.content.find('-')+1:]))
+    else:
+        await ctx.send('You aren\'t the creator!')
 
 @bot.event
 async def on_ready():
     print(bot.user.name + ' has connected to Discord!')
 
+# Run the bot
 bot.run(token)

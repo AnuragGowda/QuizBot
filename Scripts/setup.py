@@ -63,6 +63,19 @@ class Player:
             self.negs += 1
         self.score += score
     
+    def leave_team(self, tournament):
+        team = self.team
+        self.in_team, self.team = False, None
+        if len(team.players) == 1:
+            tournament.remove_team(team.name)
+            return 'You left the team ' + team.name + ', and the team was disbanded since you were the only one in it'
+        else:
+            team.leave_team(self)
+            return 'You left the team ' + team.name
+    
+    def show_score(self):
+        return 'Player Score:\n' + 'Name: ' + self.name + '\t Score:' + self.score + '\t Negs:' + self.negs + '\n'
+    
 class Tournament:
     def __init__(self, types):
         self.type = types
@@ -80,12 +93,20 @@ class Tournament:
     
     def add_player(self, player):
         self.players.append(player)
-        print(player)
     
     def add_team(self, team):
-        for player in team.players:
-            self.add_player(player)
-        self.teams.append(self.teams)
+        self.teams.append(team)
+    
+    def available_team(self, name):
+        for team in self.teams:
+            if team.name == name:
+                return False
+        return True
+
+    def remove_team(self, name):
+        for teamPos in range(len(self.teams)):
+            if self.teams[teamPos].name == name:
+                del self.teams[teamPos]
 
     def show_pos(self, player):
         self.refresh_leaderboards()
@@ -93,15 +114,14 @@ class Tournament:
             str(self.top_teams.index(player.team)+1) if player.in_team else 'Your position is: ' + str(self.top_players.index(player)+1)
 
     def refresh_leaderboards(self):
-        self.top_players = sorted(self.players, key=operator.attrgetter('score'))
-        self.top_teams = sorted(self.teams, key=operator.attrgetter('score'))
+        self.top_players = sorted(self.players, key=lambda player: player.score)
+        self.top_teams = sorted(self.teams, key=lambda team: team.score)
      
     def create_team(self, name, player):
         if player.in_team:
-            return "You are already in a team, please leave the team first" 
+            return 'You are already in a team, please leave the team first' 
     
     def rtn_player(self, name):
-        print(len(self.players))
         for player in self.players:
             if player.name == name:
                 return player
@@ -110,29 +130,23 @@ class Tournament:
     def leaderboard(self):
         self.refresh_leaderboards()
         leaderboard = 'Top Players:\n'
-        playerCount, teamCount = len(self.players) if len(self.players) <= 5 else 5, len(self.teams) if len(self.teams) <= 5 else 5
+        playerCount, teamCount = len(self.players) if len(self.top_players) <= 5 else 5, len(self.top_teams) if len(self.top_teams) <= 5 else 5
         for playerPos in range(playerCount):
-            leaderboard += '('+str(playerPos+1)+')'+self.players[playerPos].name+'\n'
+            leaderboard += '('+str(playerPos+1)+')'+self.top_players[playerPos].name+'\n'
         leaderboard += '\nTop Teams:\n'
         for teamPos in range(teamCount):
-            leaderboard += '('+str(teamPos+1)+')'+self.teams[teamPos].name+'\n'    
+            leaderboard += '('+str(teamPos+1)+')'+self.top_teams[teamPos].name+'\n'    
         return leaderboard[:-1]
     
     @property
     def final_leaderboard(self):
         self.refresh_leaderboards()
         leaderboard = '*'*10+'\nTHE GAME HAS ENDED\n'+'*'*10+'\n\nThere were a total of '+str(self.total_questions)+' questions read'\
-            '\nWith a total of '+str(self.score)+' points gained\n\nPlayers('+str(len(self.players))+'):\n\n'
+            '\nWith a total of '+str(self.score)+' points gained\n\nPlayers('+str(len(self.players))+'):\n'
         for playerPos in range(len(self.players)):
-            leaderboard += '('+str(playerPos+1)+') '+self.players[playerPos].name + '\tPoints: ' + str(self.players[playerPos].score) + '\n'
-        leaderboard += 'Teams('+str(len(self.teams))+'):\n'
+            leaderboard += '('+str(playerPos+1)+') '+self.players[playerPos].name + '\tPoints: ' + str(self.players[playerPos].score)
+            leaderboard += '\n' if not self.players[playerPos].in_team else '\t Team: '+self.players[playerPos].team.name + '\n'
+        leaderboard += '\nTeams('+str(len(self.teams))+'):\n'
         for teamPos in range(len(self.teams)):
-            leaderboard += '('+str(teamPos+1)+') '+self.teams[teamPos].name + '\tPoints: ' + str(self.players[playerPos].score) + '\n'
+            leaderboard += '('+str(teamPos+1)+') '+self.teams[teamPos].name + '\tPoints: ' + str(self.teams[teamPos].score) + '\n'
         return leaderboard[:-1]
-        
-
-        
-
-
-
-
