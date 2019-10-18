@@ -10,12 +10,16 @@ load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 
 # Set up the bot
-bot = Bot(command_prefix=['QuizBot ', 'qb ', 'QB '])
+bot = Bot(command_prefix=['QuizBot ', 'qb ', 'QB ', 'Qb '])
 
 @bot.command(name='Hello', help='Says hello to the invoker', aliases=getDifferentNames(helloWords, 'Hello', '!'))
 async def hello(ctx):
     starter = ['Hello, ', 'Hi there, ', 'Howdy ', 'Hey ', 'Sup ']
     await ctx.send(random.choice(starter)+ctx.message.author.name+'!')
+
+@bot.command(name='Tossup', help='Starts a tossup question', aliases=['t'])
+async def toss(ctx):
+    await ctx.send('This hasn\'t been implemented yet!')
 
 @bot.command(name='Start_Tournament', help='Starts a tournament (ADMIN ONLY)', aliases=getDifferentNames(startWords, 'tournament'))
 async def tournament(ctx):
@@ -41,8 +45,11 @@ async def joinTournament(ctx):
     if not runningTournament:
         await ctx.send('A tournament hasn\'t started yet!')
     else:
-        runningTournament.add_player(Player(str(ctx.message.author)))
-        await ctx.send(str(ctx.message.author)+' has joined the tournament')
+        if not runningTournament.rtn_player(str(ctx.message.author)):
+            runningTournament.add_player(Player(str(ctx.message.author)))
+            await ctx.send(str(ctx.message.author)+' has joined the tournament')
+        else:
+            await ctx.send('You are already in the tournament!')
 
 @bot.command(name='End_Tournament', help='Ends a tournament (ADMIN ONLY)', aliases=getDifferentNames(endWords, 'end_tournament'))
 async def endTournament(ctx):
@@ -83,10 +90,12 @@ async def join(ctx):
         await ctx.send('A tournament hasn\'t started yet!')
     else:
         if ctx.message.content.rfind('-') != -1:
+            if runningTournament.rtn_player(str(ctx.message.author)).in_team:
+                return await ctx.send('You are already in a team! Leave the team before joining another one!')
             for team in runningTournament.teams:
                 if team.name == ctx.message.content[ctx.message.content.rfind('-')+1:]:
-
-                    await ctx.send('You have joined the team '+ctx.message.content[ctx.message.content.rfind('-')+1:])
+                        team.join_team(runningTournament.rtn_player(str(ctx.message.author)))
+                        await ctx.send('You have joined the team '+ctx.message.content[ctx.message.content.rfind('-')+1:])           
             return await ctx.send('There is no existing team with the name '+ctx.message.content[ctx.message.content.rfind('-')+1:])
         else:
             await ctx.send('Please specify a name by typing -team name after the Join_Team call')
@@ -96,7 +105,7 @@ async def leave(ctx):
     if not runningTournament: 
         await ctx.send('A tournament hasn\'t started yet!')
     else:
-        if runningTournament.rtn_player(str(ctx.message.author)).in_team == False:
+        if not runningTournament.rtn_player(str(ctx.message.author)).in_team:
             await ctx.send('You aren\'t in a team!')
         else:
             await ctx.send(runningTournament.rtn_player(str(ctx.message.author)).leave_team(runningTournament))
@@ -107,15 +116,26 @@ async def myPos(ctx):
     if not runningTournament:
         await ctx.send('A tournament hasn\'t started yet!')
     else:
-        if ctx.message.content.rfind('-') != -1:
-            pass
+        if ctx.message.content.find('-') != -1 or ctx.message.content.find(',') != -1:
+            if ctx.message.content[ctx.message.content.find('-')+1:ctx.message.content.find(',')] not in ['team','player']:
+                await ctx.send('Please use the correct format of -team,team_name or -player,player_name after the Get_Pos call')
+            else:
+                if ctx.message.content[ctx.message.content.find('-'):ctx.message.content.find(',')] == 'team':
+                    pass
+                else:
+                    await ctx.send(ctx.message.content[ctx.message.content.find(',')+1:])
+                    if not runningTournament.rtn_player(ctx.message.content[ctx.message.content.find(',')+1:]):
+                        await ctx.send('That player isn\'t in the tournament!')
+                    else:
+                        await ctx.send(runningTournament.show_pos(runningTournament.rtn_player(ctx.message.content[ctx.message.content.find(','):])))
+                        
         else:
             await ctx.send('Please specify a name by typing -team,team_name or -player,player_name after the Get_Pos call')
     
 @bot.command(name='SUPER_HELP', help='You should run this command if you need help!', aliases=['h'])
 async def hlp(ctx):
     helpString = \
-        '\\\t\\\t**Commands and Usage for QuizBot**\n\n'+\
+        '**Commands and Usage for QuizBot**\n\n'+\
         '**Command-Prefix**: *(This is not an actual command)* To \"call\" the bot, either use QuizBot, qb or QB, each followed by a space character. This is used BEFORE EVERY COMMAND that is listed below\n\n\n'+\
         'For the following commands, to get the full alias (which is an alternate way to use the command, for example, instead of typing qb Hello, you may type qb hi!) list (and a brief description), type the Command-Prefix (QuizBot, qb, QB) followed by help and then a space and the command/keyword (ex. qb help Hello) you want the list for\n\n'+\
         'ADMIN and CREATOR commands: ADMIN commands are only useable for those who have the discord role \'ADMIN\' in a server that has the bot. CREATOR command is meant for the person who set up the bot.\n\n\n'+\
