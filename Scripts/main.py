@@ -120,15 +120,16 @@ async def myPos(ctx):
             if ctx.message.content[ctx.message.content.find('-')+1:ctx.message.content.find(',')] not in ['team','player']:
                 await ctx.send('Please use the correct format of -team,team_name or -player,player_name after the Get_Pos call')
             else:
-                if ctx.message.content[ctx.message.content.find('-'):ctx.message.content.find(',')] == 'team':
-                    pass
+                if ctx.message.content[ctx.message.content.find('-')+1:ctx.message.content.find(',')] == 'team':
+                    if ctx.message.content[ctx.message.content.find(',')+1:] not in [team.name for team in runningTournament.teams]:
+                        await ctx.send('That team isn\'t in the tournament')
+                    else:
+                        await ctx.send(runningTournament.show_teamPos(ctx.message.content[ctx.message.content.find(',')+1:]))
                 else:
-                    await ctx.send(ctx.message.content[ctx.message.content.find(',')+1:])
                     if not runningTournament.rtn_player(ctx.message.content[ctx.message.content.find(',')+1:]):
                         await ctx.send('That player isn\'t in the tournament!')
                     else:
-                        await ctx.send(runningTournament.show_pos(runningTournament.rtn_player(ctx.message.content[ctx.message.content.find(','):])))
-                        
+                        await ctx.send(runningTournament.show_pos(runningTournament.rtn_player(ctx.message.content[ctx.message.content.find(',')+1:])))           
         else:
             await ctx.send('Please specify a name by typing -team,team_name or -player,player_name after the Get_Pos call')
     
@@ -161,8 +162,9 @@ async def evaluate(ctx):
         await ctx.send('You aren\'t the creator!')
 
 @bot.event
-async def on_ready():
+async def on_ready(ctx):
     print(bot.user.name + ' has connected to Discord!')
+    await ctx.send('I have connected to Discord!')
 
 # Run the bot
 bot.run(token)

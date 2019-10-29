@@ -40,7 +40,7 @@ class Team:
         del self.players[self.players.index(player)]
 
     def show_scores(self):
-        compositeScore = 'Members of '+self.name+':\n'
+        compositeScore = 'Members of ' + self.name + ':\n'
         for player in self.players:
             compositeScore += 'Name: ' + player.name + '\t Score:' + player.score + '\t Negs:' + player.negs + '\n'
         return compositeScore[:-1]
@@ -109,8 +109,18 @@ class Tournament:
 
     def show_pos(self, player):
         self.refresh_leaderboards()
-        return 'Player Name:'+player.name+'\nYour position is: '+str(self.top_players.index(player)+1) + '\n Your team position is: ' + \
-            str(self.top_teams.index(player.team)+1) if player.in_team else 'Your position is: ' + str(self.top_players.index(player)+1)
+        if player.in_team:
+            return 'Player Name: ' + player.name + '\nPlayer position: ' + str(self.top_players.index(player)+1) + '\nPlayer score: ' + player.score + '\nPlayer negs: ' + player.negs +\
+                '\nPlayer\'s team position: ' + str(self.top_teams.index(player.team)+1)
+        else:
+            return 'Player Name: ' + player.name + '\nPlayer position: '+str(self.top_players.index(player)+1) + '\nPlayer score: ' + player.score + '\nPlayer negs: ' + player.negs
+    
+    def show_teamPos(self, team):
+        self.refresh_leaderboards()
+        for teamPos in range(len(self.top_teams)):
+            if self.top_teams[teamPos].name == team:
+                return 'Team Name: ' + self.top_teams[teamPos].name + '\nTeam position: '+str(teamPos+1) + '\nTeam score' + self.top_teams[teamPos].score+\
+                    '\nTeam players: ' + (''.join([player.name + ', ' for player in self.top_teams[teamPos]]))[:-2]
 
     def refresh_leaderboards(self):
         self.top_players = sorted(self.players, key=lambda player: player.score)
@@ -140,12 +150,12 @@ class Tournament:
     @property
     def final_leaderboard(self):
         self.refresh_leaderboards()
-        leaderboard = '*'*10+'\nTHE GAME HAS ENDED\n'+'*'*10+'\n\nThere were a total of '+str(self.total_questions)+' questions read'\
-            '\nWith a total of '+str(self.score)+' points gained\n\nPlayers('+str(len(self.players))+'):\n'
+        leaderboard = '\*'*10 + '\nTHE GAME HAS ENDED\n' + '\*'*10 + '\n\nThere were a total of ' + str(self.total_questions) + ' questions read'\
+            '\nWith a total of ' + str(self.score) + ' points gained\n\nPlayers('+str(len(self.players)) + '):\n'
         for playerPos in range(len(self.players)):
-            leaderboard += '('+str(playerPos+1)+') '+self.players[playerPos].name + '\tPoints: ' + str(self.players[playerPos].score)
-            leaderboard += '\n' if not self.players[playerPos].in_team else '\t Team: '+self.players[playerPos].team.name + '\n'
-        leaderboard += '\nTeams('+str(len(self.teams))+'):\n'
+            leaderboard += '('+str(playerPos+1) + ') ' + self.players[playerPos].name + '\tPoints: ' + str(self.players[playerPos].score)
+            leaderboard += '\n' if not self.players[playerPos].in_team else '\t Team: ' + self.players[playerPos].team.name + '\n'
+        leaderboard += '\nTeams('+str(len(self.teams)) + '):\n'
         for teamPos in range(len(self.teams)):
-            leaderboard += '('+str(teamPos+1)+') '+self.teams[teamPos].name + '\tPoints: ' + str(self.teams[teamPos].score) + '\n'
+            leaderboard += '('+str(teamPos+1) + ') ' + self.teams[teamPos].name + '\tPoints: ' + str(self.teams[teamPos].score) + '\n'
         return leaderboard[:-1]
