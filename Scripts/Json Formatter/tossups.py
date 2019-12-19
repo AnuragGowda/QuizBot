@@ -24,8 +24,8 @@ hidden_inputs = login_html.xpath(r'//form//input[@type="hidden"]')
 form = {x.attrib["name"]: x.attrib["value"] for x in hidden_inputs}
 
 # Fill out the parts of the form that we need to fill out
-form['admin_user[password]']='ZedZedZed123'
-form['admin_user[email]']='gowdaanuragr@gmail.com'
+form['admin_user[password]']='mypassword'
+form['admin_user[email]']='myemail'
 
 # Post the form
 s.post('https://www.quizdb.org/admin/login', data=form)
