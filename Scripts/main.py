@@ -71,10 +71,13 @@ async def leaderboard(ctx):
 
 @bot.command(name='Create_Team', help='Creates a team for a tournament', aliases=getDifferentNames(createWords, 'create_team'))
 async def create(ctx):
-    global runningTournament
     if not runningTournament: 
         await ctx.send('A tournament hasn\'t started yet!')
+    elif not runningTournament.rtn_player(str(ctx.message.author)):
+        await ctx.send('You need to join the tournament before trying to use this command!')
     else:
+        if runningTournament.rtn_player(str(ctx.message.author)).in_team:
+                return await ctx.send('You are already in a team! Leave the team before creating one!')
         if ctx.message.content.rfind('-') != -1:
             for team in runningTournament.teams:
                 if team.name == ctx.message.content[ctx.message.content.rfind('-')+1:]:
@@ -88,6 +91,8 @@ async def create(ctx):
 async def join(ctx):
     if not runningTournament:
         await ctx.send('A tournament hasn\'t started yet!')
+    elif not runningTournament.rtn_player(str(ctx.message.author)):
+        await ctx.send('You need to join the tournament before trying to use this command!')
     else:
         if ctx.message.content.rfind('-') != -1:
             if runningTournament.rtn_player(str(ctx.message.author)).in_team:
@@ -95,7 +100,7 @@ async def join(ctx):
             for team in runningTournament.teams:
                 if team.name == ctx.message.content[ctx.message.content.rfind('-')+1:]:
                         team.join_team(runningTournament.rtn_player(str(ctx.message.author)))
-                        await ctx.send('You have joined the team '+ctx.message.content[ctx.message.content.rfind('-')+1:])           
+                        return await ctx.send('You have joined the team '+ctx.message.content[ctx.message.content.rfind('-')+1:])           
             return await ctx.send('There is no existing team with the name '+ctx.message.content[ctx.message.content.rfind('-')+1:])
         else:
             await ctx.send('Please specify a name by typing -team name after the Join_Team call')
@@ -104,6 +109,8 @@ async def join(ctx):
 async def leave(ctx):
     if not runningTournament: 
         await ctx.send('A tournament hasn\'t started yet!')
+    elif not runningTournament.rtn_player(str(ctx.message.author)):
+        await ctx.send('You need to join the tournament before trying to use this command!')
     else:
         if not runningTournament.rtn_player(str(ctx.message.author)).in_team:
             await ctx.send('You aren\'t in a team!')
@@ -112,26 +119,25 @@ async def leave(ctx):
 
 @bot.command(name='Get_Pos', help='Gets a player or team position in a tournament', aliases=['gp'])
 async def myPos(ctx):
-    global runningTournament
     if not runningTournament:
         await ctx.send('A tournament hasn\'t started yet!')
     else:
-        if ctx.message.content.find('-') != -1 or ctx.message.content.find(',') != -1:
-            if ctx.message.content[ctx.message.content.find('-')+1:ctx.message.content.find(',')] not in ['team','player']:
-                await ctx.send('Please use the correct format of -team,team_name or -player,player_name after the Get_Pos call')
+        if ctx.message.content.find('-') != -1 or ctx.message.content.find('@') != -1:
+            if ctx.message.content[ctx.message.content.find('-')+1:ctx.message.content.find('@')-1] not in ['team','player ']:
+                await ctx.send('Please use the correct format of -team @team_name or -player @player_name after the Get_Pos call')
             else:
-                if ctx.message.content[ctx.message.content.find('-')+1:ctx.message.content.find(',')] == 'team':
-                    if ctx.message.content[ctx.message.content.find(',')+1:] not in [team.name for team in runningTournament.teams]:
+                if ctx.message.content[ctx.message.content.find('-')+1:ctx.message.content.find('@')-1] == 'team':
+                    if ctx.message.content[ctx.message.content.find('@')+1:] not in [team.name for team in runningTournament.teams]:
                         await ctx.send('That team isn\'t in the tournament')
                     else:
-                        await ctx.send(runningTournament.show_teamPos(ctx.message.content[ctx.message.content.find(',')+1:]))
+                        await ctx.send(runningTournament.show_teamPos(ctx.message.content[ctx.message.content.find('@')+1:]))
                 else:
-                    if not runningTournament.rtn_player(ctx.message.content[ctx.message.content.find(',')+1:]):
+                    if not runningTournament.rtn_player(str(ctx.guild.get_member(int(ctx.message.content[ctx.message.content.find('@')+2:-1])))):
                         await ctx.send('That player isn\'t in the tournament!')
                     else:
-                        await ctx.send(runningTournament.show_pos(runningTournament.rtn_player(ctx.message.content[ctx.message.content.find(',')+1:])))           
+                        await ctx.send(runningTournament.show_pos(runningTournament.rtn_player(str(ctx.guild.get_member(int(ctx.message.content[ctx.message.content.find('@')+2:-1]))))))           
         else:
-            await ctx.send('Please specify a name by typing -team,team_name or -player,player_name after the Get_Pos call')
+            await ctx.send('Please specify a name by typing -team @team_name or -player @player_name after the Get_Pos call')
     
 @bot.command(name='SUPER_HELP', help='You should run this command if you need help!', aliases=['h'])
 async def hlp(ctx):
@@ -162,9 +168,8 @@ async def evaluate(ctx):
         await ctx.send('You aren\'t the creator!')
 
 @bot.event
-async def on_ready(ctx):
+async def on_ready():
     print(bot.user.name + ' has connected to Discord!')
-    await ctx.send('I have connected to Discord!')
 
 # Run the bot
 bot.run(token)

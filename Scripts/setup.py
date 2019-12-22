@@ -29,20 +29,20 @@ def validCategory(category):
 class Team:
     def __init__(self, name, player):
         self.name = name
-        self.players = [player]
-        player.in_team = True
-        player.team = self
+        self.players = []
+        self.join_team(player)
     
     def join_team(self, player):
         self.players.append(player)
+        player.in_team = True
+        player.team = self
     
     def leave_team(self, player):
         del self.players[self.players.index(player)]
 
     def show_scores(self):
         compositeScore = 'Members of ' + self.name + ':\n'
-        for player in self.players:
-            compositeScore += 'Name: ' + player.name + '\t Score:' + player.score + '\t Negs:' + player.negs + '\n'
+        compositeScore = ''.join([player.show_score() for player in self.players])
         return compositeScore[:-1]
     
     @property
@@ -72,8 +72,9 @@ class Player:
             team.leave_team(self)
             return 'You left the team ' + team.name
     
+    #Should make property see effects in main before, after edit team score
     def show_score(self):
-        return 'Player Score:\n' + 'Name: ' + self.name + '\t Score:' + self.score + '\t Negs:' + self.negs + '\n'
+        return 'Player Score:\n' + 'Name: ' + self.name + '\t Score:' + str(self.score) + '\t Negs:' + str(self.negs) + '\n'
     
 class Tournament:
     def __init__(self, types):
@@ -110,17 +111,17 @@ class Tournament:
     def show_pos(self, player):
         self.refresh_leaderboards()
         if player.in_team:
-            return 'Player Name: ' + player.name + '\nPlayer position: ' + str(self.top_players.index(player)+1) + '\nPlayer score: ' + player.score + '\nPlayer negs: ' + player.negs +\
+            return 'Player Name: ' + player.name + '\nPlayer position: ' + str(self.top_players.index(player)+1) + '\nPlayer score: ' + str(player.score) + '\nPlayer negs: ' + str(player.negs) +\
                 '\nPlayer\'s team position: ' + str(self.top_teams.index(player.team)+1)
         else:
-            return 'Player Name: ' + player.name + '\nPlayer position: '+str(self.top_players.index(player)+1) + '\nPlayer score: ' + player.score + '\nPlayer negs: ' + player.negs
+            return 'Player Name: ' + player.name + '\nPlayer position: '+str(self.top_players.index(player)+1) + '\nPlayer score: ' + str(player.score) + '\nPlayer negs: ' + str(player.negs)
     
     def show_teamPos(self, team):
         self.refresh_leaderboards()
         for teamPos in range(len(self.top_teams)):
             if self.top_teams[teamPos].name == team:
-                return 'Team Name: ' + self.top_teams[teamPos].name + '\nTeam position: '+str(teamPos+1) + '\nTeam score' + self.top_teams[teamPos].score+\
-                    '\nTeam players: ' + (''.join([player.name + ', ' for player in self.top_teams[teamPos]]))[:-2]
+                return 'Team Name: ' + self.top_teams[teamPos].name + '\nTeam position: '+str(teamPos+1) + '\nTeam score: ' + str(self.top_teams[teamPos].score)+\
+                    '\nTeam players: ' + ''.join([player.name + ', ' for player in self.top_teams[teamPos].players])[:-2]
 
     def refresh_leaderboards(self):
         self.top_players = sorted(self.players, key=lambda player: player.score)

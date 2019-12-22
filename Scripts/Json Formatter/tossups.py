@@ -1,5 +1,5 @@
 '''
-This is the program that I made to recursivly access the api to "download"
+This is the program that I made to recursively access the api to "download"
 all of the tossups that quizDb has into seperate json files. The reason I had
 to do this was because the api doesn't allow you to simply ask for all 90,000
 quesions (well it does, but then it unintentionally ddoses itself -- as stated
@@ -29,21 +29,6 @@ form['admin_user[email]']='gowdaanuragr@gmail.com'
 
 # Post the form
 s.post('https://www.quizdb.org/admin/login', data=form)
-
-'''
-jsons = []
-currentEvents = []
-fineArts = []
-geography = []
-history = []
-literature = []
-mythology = []
-philosophy = []
-religion = []
-science = []
-socialScience = []
-trash = []
-'''
 
 # Define a bunch of lists to hold the questions
 jsons, currentEvents, fineArts, geography, history, \
@@ -81,7 +66,7 @@ for data in jsons:
         # answer, and null as the category id       
         if question['text'] != '[missing]':
             eval(conv[question['category_id']]).append(\
-            {'question':question['text'], 'answer':question['answer']})
+            [question['text'], question['answer']])
 
 # Now we have to create the individual json files using our lists
 for i in conv:
