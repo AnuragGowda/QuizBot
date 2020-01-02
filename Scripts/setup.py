@@ -1,7 +1,18 @@
 import operator
+
+# Bot prefixes
+prefixes = ['QuizBot ', 'qb ', 'QB ', 'Qb ', 'q?', '?']
+
+# Set the running Tournament to be None by default
 runningTournament = None
 
-catList = ['lit', 'literature', 'math', 'science', 'etc.']
+def validCategory(category):
+    for cat in category:
+        if cat not in catList:
+            return False
+    return True
+
+# Get a bunch of aliases for the different bot commands
 helloWords = ['Hi', 'Howdy']
 tournamentWords = ['Tourney', 'T', 'Game', 'G']
 fullTournamentWords = tournamentWords+['tournament']
@@ -20,12 +31,20 @@ def getDifferentNames(commandList, command, special=None):
     else:
         return commandList+[i.lower() for i in commandList]+[i.upper() for i in commandList if i.upper() not in commandList]
 
-def validCategory(category):
-    for cat in category:
-        if cat not in catList:
-            return False
-    return True
+# Load all the questions/answers for all the categories
+questionList = ['literature','science','history','fineArts','religion','mythology','philosophy','socialScience','geography','currentEvents','trash']
+for cat in range(len(questionList)):
+    with open('..\\Questions\\Tossups\\'+questionList[cat]+'.json', encoding='utf8') as f:
+        questionList[cat] = eval(''.join(f.readlines()))
+literatureQuestions, scienceQuestions, historyQuestions, fineArtsQuestions, religionQuestions, mythologyQuestions, philosophyQuestions, socialScienceQuestion, geographyQuestions, currentEventsQuestions, trashQuestions = questionList
 
+# To validate the category that is selected for the type of tournament
+catList = {'lit':literatureQuestions, 'literature':literatureQuestions, 'sci':scienceQuestions, 'science':scienceQuestions, 'hist':historyQuestions, 'history':historyQuestions, 'fa':fineArtsQuestions, 'finearts':fineArtsQuestions, 'religion':religionQuestions, 'myth':mythologyQuestions, 'mythology':mythologyQuestions, 'philosophy':philosophyQuestions, 'socialscience':socialScienceQuestion, 'geo':geographyQuestions, 'geography':geographyQuestions, 'ce':currentEventsQuestions, 'currentevents':currentEventsQuestions, 'trash':trashQuestions}
+
+# Stores all tossup data
+tossUps = {}
+
+# Create a team class to represent the teams that players can create
 class Team:
     def __init__(self, name, player):
         self.name = name
@@ -49,6 +68,7 @@ class Team:
     def score(self):
         return sum([i.score for i in self.players])
 
+# Create a player class to handle a players actions
 class Player:
     def __init__(self, name):
         self.name = name
@@ -72,10 +92,10 @@ class Player:
             team.leave_team(self)
             return 'You left the team ' + team.name
     
-    #Should make property see effects in main before, after edit team score
     def show_score(self):
         return 'Player Score:\n' + 'Name: ' + self.name + '\t Score:' + str(self.score) + '\t Negs:' + str(self.negs) + '\n'
-    
+
+# Creates a tournament class to handle interactions that a tournament has    
 class Tournament:
     def __init__(self, types):
         self.type = types
@@ -151,7 +171,7 @@ class Tournament:
     @property
     def final_leaderboard(self):
         self.refresh_leaderboards()
-        leaderboard = '\*'*10 + '\nTHE GAME HAS ENDED\n' + '\*'*10 + '\n\nThere were a total of ' + str(self.total_questions) + ' questions read'\
+        leaderboard = '\\*'*10 + '\nTHE GAME HAS ENDED\n' + '\\*'*10 + '\n\nThere were a total of ' + str(self.total_questions) + ' questions read'\
             '\nWith a total of ' + str(self.score) + ' points gained\n\nPlayers('+str(len(self.players)) + '):\n'
         for playerPos in range(len(self.players)):
             leaderboard += '('+str(playerPos+1) + ') ' + self.players[playerPos].name + '\tPoints: ' + str(self.players[playerPos].score)

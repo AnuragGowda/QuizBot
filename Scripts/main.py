@@ -1,6 +1,9 @@
 # Import Files
 import os
 import random
+import random
+import asyncio
+import textwrap
 from discord.ext.commands import Bot
 from dotenv import load_dotenv
 from setup import *
@@ -10,16 +13,160 @@ load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 
 # Set up the bot
-bot = Bot(command_prefix=['QuizBot ', 'qb ', 'QB ', 'Qb '])
+bot = Bot(command_prefix=prefixes)
 
 @bot.command(name='Hello', help='Says hello to the invoker', aliases=getDifferentNames(helloWords, 'Hello', '!'))
 async def hello(ctx):
     starter = ['Hello, ', 'Hi there, ', 'Howdy ', 'Hey ', 'Sup ']
     await ctx.send(random.choice(starter)+ctx.message.author.name+'!')
 
+'''
+Ignore this I explain in comments later on anyway
+
+What tossUps must hold:
+Since we want each channel to be able to have their own tossup running at a time, we create a dict that has keys which are 
+the id's of the channels (which are unique throught all of discord). Each of these keys point to a list which eventually 
+will contain a couple of values that are useful:
+**  I changed this to be a dict as it's simply easier to store the data that way then to rememebr what data is at what index,
+but the data is the same, the indices are the keys reading, question, fullquestion, fullanswer (the third index is split up)
+currentBuzzer, and buzzList respectively **
+The first is if there is currently a tossup running/being read. This is stored as a boolean, and while true, it means that there
+is a tossup, and nobody has buzzed yet, or previous buzzes have been wrong, and therefore the current question must continue
+being read. If false, the tossup isn't currently being read, which means that either someone has buzzed, or a tossup simply
+hasn't been requested.
+The second holds a direct reference to the message object in which we orignially sent question so that we can edit it later,
+which can be used to create the appearance of it being read, add buzz emojis where people have buzzed, and to reveal the 
+whole question once the time runs out or when somebody gets the answer right
+The third is actually a dictionary which contains the full question and answer so that we can check if the answer is right later,
+and also to read and complete the question which is stored in index 1 (the second value)
+The fourth is the id of the person that has buzzed so that we can check that the person who answers later is the same person who
+buzzed.
+The fifth is a timeout boolean, which checks to see if the user actually answered the question after buzzing, if they didn't
+we need to send a time's up message.
+The sixth is a list of people who have already buzzed, as they can't buzz again.
+'''
+
 @bot.command(name='Tossup', help='Starts a tossup question', aliases=['t'])
 async def toss(ctx):
-    await ctx.send('This hasn\'t been implemented yet!')
+    # If specified category
+    if ctx.message.content.find('-') != -1:
+        # Check if cat is valid
+        if validCategory([ctx.message.content[ctx.message.content.find('-')+1:]]):
+
+            # Set reading to true, get the answer (we get the question later) and create a counter (which will help us add on to the question later)
+            # also create a buzzList which will keep track of who has buzzed
+            tossUps[ctx.message.channel.id] = {'reading':True}
+            cat, tossUps[ctx.message.channel.id]['counter'] = random.choice(catList[ctx.message.content[ctx.message.content.find('-')+1:]]), 1
+            tossUps[ctx.message.channel.id]['fullanswer'] = cat['answer']
+            tossUps[ctx.message.channel.id]['buzzList'] = []
+
+            # Create "bits" to the question which we can then add on later - I thought that this would be the simplest method and best for readablity
+            tossUps[ctx.message.channel.id]['fullquestion'] = textwrap.wrap(cat['question'], len(cat['question'])/15)
+            
+            # Send the beginning of the question
+            question = await ctx.send(tossUps[ctx.message.channel.id]['fullquestion'][0])
+
+            # Store question object (what is displayed in discord - the question message that is send) so we can edit it later
+            tossUps[ctx.message.channel.id]['question'] = question
+
+            # We only want to read the function if someone hasn't buzzed, or if they have and have answered incorrectly
+            while tossUps[ctx.message.channel.id]['reading']:
+
+                # Increment counter
+                tossUps[ctx.message.channel.id]['counter'] += 1
+
+                # If the counter is larger than the number of indicies we have, it means we have finished reading, so we have to stop
+                if tossUps[ctx.message.channel.id]['counter'] >= len(tossUps[ctx.message.channel.id]['fullquestion']):
+                    tossUps[ctx.message.channel.id]['reading'] = False
+
+                # Otherwise, we keep reading
+                else:
+
+                    # Add on to the question
+                    await question.edit(content=tossUps[ctx.message.channel.id]['question'].content+' '+tossUps[ctx.message.channel.id]['fullquestion'][tossUps[ctx.message.channel.id]['counter']])
+
+                    # Use a special version of sleep so we can create the effect of being read
+                    await asyncio.sleep(1)
+
+            # Give 2 seconds before the timeout
+            await asyncio.sleep(2)
+
+            # The reading now ends with either a correct buzz or a timeout, but we don't want to timeout while someone has buzzed
+            # Therefore we create a loop to constantly check to see if there is a buzzer or if there was a correct buzz, as soon as 
+            # the buzzer has finished (if there is a buzzer) we have the reading timeout, similarly, the reading ends if the buzzer
+            # we are waiting on gets a correct buzz
+            while True:
+                
+                # Check to see if someone is answering
+                if not 'currentBuzzer' in tossUps[ctx.message.channel.id] or not tossUps[ctx.message.channel.id]['currentBuzzer']:
+                    
+                    # We need to finish the question and give a times up and the answer
+                    # Get rid of the ugly stuff at the end cause nobody cares where the question came from
+                    if '&lt;' not in tossUps[ctx.message.channel.id]['fullanswer']:
+                        return await ctx.send('**Time\'s up!** \nThe anwer was:\t'+tossUps[ctx.message.channel.id]['fullanswer'])
+                    
+                    # Otherwise 
+                    return await ctx.send('**Time\'s up!** \nThe anwer was: '+tossUps[ctx.message.channel.id]['fullanswer'][:tossUps[ctx.message.channel.id]['fullanswer'].find('&lt;')-1])
+
+                # If the answer was already guessed just exit as everything else is handled by other functions
+                elif tossUps[ctx.message.channel.id]['answered']:
+                    return
+
+        # Invalid cat
+        else:
+            await ctx.send(ctx.message.content[ctx.message.content.find('-')+1:])
+            await ctx.send('That is an invalid category')
+
+    # No cat specified
+    else:
+        await ctx.send('Specify a category by typing -category_name after tossup call')
+
+@bot.command(name='b')
+async def buzz(ctx):
+    if ctx.message.channel.id in tossUps and tossUps[ctx.message.channel.id]['reading']:
+        tossUps[ctx.message.channel.id]['reading'] = False
+        tossUps[ctx.message.channel.id]['currentBuzzer'] = ctx.message.author.id
+        if 'buzzList' in tossUps[ctx.message.channel.id] and ctx.message.author.id in tossUps[ctx.message.channel.id]['buzzList']:
+            return await ctx.send('You already buzzed!')
+        elif 'buzzList' not in tossUps[ctx.message.channel.id]:
+            tossUps[ctx.message.channel.id]['buzzList'] = [ctx.message.author.id]
+        else: 
+            tossUps[ctx.message.channel.id]['buzzList'].append(ctx.message.author.id)
+        await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+'🔔') 
+        await ctx.send('Buzz by: <@'+str(ctx.message.author.id)+'>, 5 secs to answer!')
+        # await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+''.join([i for i in ['fullquestion'][tossUps[ctx.message.channel.id]['counter']:len(tossUps[ctx.message.channel.id]['fullquestion'])]))
+    else:
+        await ctx.send('Either you buzzed too late or there isn\'t a tossup going on right now')
+
+@bot.command()
+async def ans(ctx):
+    if not ctx.message.channel.id in tossUps:
+        await ctx.send('You have to start a tossup before answering')
+    elif tossUps[ctx.message.channel.id]['currentBuzzer'] != ctx.message.author.id:
+        await ctx.send('You have to buzz before answering!')
+    else:
+
+        # Fix this, there are prompts, and this inst acc at all
+
+        if ctx.message.content in tossUps[ctx.message.channel.id]['fullanswer']:
+            await ctx.send('That is correct!')
+            await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['fullquestion'])
+            await ctx.send('The anwer was (this needs to be formatted probably):\t'+tossUps[ctx.message.channel.id]['fullanswer'])
+        else:
+            await ctx.send('Incorrect!')
+            await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+'🔕') 
+            # resume the reading idk how rn
+            await resumeRead(ctx)
+
+async def resumeRead(ctx):
+    while tossUps[ctx.message.channel.id]['reading']:
+        tossUps[ctx.message.channel.id]['counter'] += 1
+        await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['fullquestion'][:int(len(tossUps[ctx.message.channel.id]['fullquestion'])*tossUps[ctx.message.channel.id]['counter']/15)])
+        await asyncio.sleep(1)
+
+@bot.command()
+async def id(ctx):
+    await ctx.send(ctx.message.author.id)
 
 @bot.command(name='Start_Tournament', help='Starts a tournament (ADMIN ONLY)', aliases=getDifferentNames(startWords, 'tournament'))
 async def tournament(ctx):
@@ -166,6 +313,10 @@ async def evaluate(ctx):
         await ctx.send(eval(ctx.message.content[ctx.message.content.find('-')+1:]))
     else:
         await ctx.send('You aren\'t the creator!')
+
+@bot.command()
+async def test(ctx):
+    await ctx.edit(content="newcontent")
 
 @bot.event
 async def on_ready():
