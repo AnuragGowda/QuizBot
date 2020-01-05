@@ -7,6 +7,7 @@ import textwrap
 from discord.ext.commands import Bot
 from dotenv import load_dotenv
 from setup import *
+from distance import levenshtein as diff
 
 # Load token from .env file
 load_dotenv()
@@ -48,14 +49,20 @@ The sixth is a list of people who have already buzzed, as they can't buzz again.
 
 @bot.command(name='Tossup', help='Starts a tossup question', aliases=['t'])
 async def toss(ctx):
+
+    # Check to see if there isn't a tossup already running
+    if ctx.message.channel.id in tossUps and tossUps[ctx.message.channel.id]['running']:
+        return await ctx.send('There is already a tossup running in this channel!')
+
     # If specified category
     if ctx.message.content.find('-') != -1:
+
         # Check if cat is valid
         if validCategory([ctx.message.content[ctx.message.content.find('-')+1:]]):
 
-            # Set reading to true, get the answer (we get the question later) and create a counter (which will help us add on to the question later)
+            # Set reading and running to true, get the answer (we get the question later) and create a counter (which will help us add on to the question later)
             # also create a buzzList which will keep track of who has buzzed
-            tossUps[ctx.message.channel.id] = {'reading':True}
+            tossUps[ctx.message.channel.id] = {'reading':True, 'running':True, 'completed':False}
             cat, tossUps[ctx.message.channel.id]['counter'] = random.choice(catList[ctx.message.content[ctx.message.content.find('-')+1:]]), 1
             tossUps[ctx.message.channel.id]['fullanswer'] = cat['answer']
             tossUps[ctx.message.channel.id]['buzzList'] = []
@@ -70,47 +77,7 @@ async def toss(ctx):
             tossUps[ctx.message.channel.id]['question'] = question
 
             # We only want to read the function if someone hasn't buzzed, or if they have and have answered incorrectly
-            while tossUps[ctx.message.channel.id]['reading']:
-
-                # Increment counter
-                tossUps[ctx.message.channel.id]['counter'] += 1
-
-                # If the counter is larger than the number of indicies we have, it means we have finished reading, so we have to stop
-                if tossUps[ctx.message.channel.id]['counter'] >= len(tossUps[ctx.message.channel.id]['fullquestion']):
-                    tossUps[ctx.message.channel.id]['reading'] = False
-
-                # Otherwise, we keep reading
-                else:
-
-                    # Add on to the question
-                    await question.edit(content=tossUps[ctx.message.channel.id]['question'].content+' '+tossUps[ctx.message.channel.id]['fullquestion'][tossUps[ctx.message.channel.id]['counter']])
-
-                    # Use a special version of sleep so we can create the effect of being read
-                    await asyncio.sleep(1)
-
-            # Give 2 seconds before the timeout
-            await asyncio.sleep(2)
-
-            # The reading now ends with either a correct buzz or a timeout, but we don't want to timeout while someone has buzzed
-            # Therefore we create a loop to constantly check to see if there is a buzzer or if there was a correct buzz, as soon as 
-            # the buzzer has finished (if there is a buzzer) we have the reading timeout, similarly, the reading ends if the buzzer
-            # we are waiting on gets a correct buzz
-            while True:
-                
-                # Check to see if someone is answering
-                if not 'currentBuzzer' in tossUps[ctx.message.channel.id] or not tossUps[ctx.message.channel.id]['currentBuzzer']:
-                    
-                    # We need to finish the question and give a times up and the answer
-                    # Get rid of the ugly stuff at the end cause nobody cares where the question came from
-                    if '&lt;' not in tossUps[ctx.message.channel.id]['fullanswer']:
-                        return await ctx.send('**Time\'s up!** \nThe anwer was:\t'+tossUps[ctx.message.channel.id]['fullanswer'])
-                    
-                    # Otherwise 
-                    return await ctx.send('**Time\'s up!** \nThe anwer was: '+tossUps[ctx.message.channel.id]['fullanswer'][:tossUps[ctx.message.channel.id]['fullanswer'].find('&lt;')-1])
-
-                # If the answer was already guessed just exit as everything else is handled by other functions
-                elif tossUps[ctx.message.channel.id]['answered']:
-                    return
+            await read(ctx)
 
         # Invalid cat
         else:
@@ -123,50 +90,151 @@ async def toss(ctx):
 
 @bot.command(name='b')
 async def buzz(ctx):
+    # Check to see if there is a question that is currently being read
     if ctx.message.channel.id in tossUps and tossUps[ctx.message.channel.id]['reading']:
-        tossUps[ctx.message.channel.id]['reading'] = False
-        tossUps[ctx.message.channel.id]['currentBuzzer'] = ctx.message.author.id
-        if 'buzzList' in tossUps[ctx.message.channel.id] and ctx.message.author.id in tossUps[ctx.message.channel.id]['buzzList']:
+
+        # If they have already buzzed, send a message and exit
+        if ctx.message.author.id in tossUps[ctx.message.channel.id]['buzzList']:
             return await ctx.send('You already buzzed!')
-        elif 'buzzList' not in tossUps[ctx.message.channel.id]:
-            tossUps[ctx.message.channel.id]['buzzList'] = [ctx.message.author.id]
+        
+        # Otherwise, we need to add them to the buzzList
         else: 
             tossUps[ctx.message.channel.id]['buzzList'].append(ctx.message.author.id)
+
+        # We need to stop the reading and set the current buzzer to whoever buzzed so that they can answer later
+        tossUps[ctx.message.channel.id]['reading'] = False
+        tossUps[ctx.message.channel.id]['currentBuzzer'] = ctx.message.author.id
+        
+        # Edit the message to show a buzz, and send a message saying who buzzed
         await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+'🔔') 
-        await ctx.send('Buzz by: <@'+str(ctx.message.author.id)+'>, 5 secs to answer!')
-        # await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+''.join([i for i in ['fullquestion'][tossUps[ctx.message.channel.id]['counter']:len(tossUps[ctx.message.channel.id]['fullquestion'])]))
+        await ctx.send('Buzz by: <@'+str(ctx.message.author.id)+'>, 10 secs to answer!')
+        
+        # Check to see if there is no answer in 5 seconds, we can do this by checking to see if there was a new buzzer or not (as on answer currentBuzzer is cleared)
+        await asyncio.sleep(10)
+        if ctx.message.author.id == tossUps[ctx.message.channel.id]['currentBuzzer']:
+
+            # Clear current buzzer and send a timeout message
+            tossUps[ctx.message.channel.id]['currentBuzzer'] = None
+            await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content[:-1]+'🔕') 
+            await ctx.send('No answer!' )
+
+            # Resume the reading
+            tossUps[ctx.message.channel.id]['reading'] = True
+            await read(ctx)
+
+    # They could've buzzed late or there simply isn't a tossup running
     else:
         await ctx.send('Either you buzzed too late or there isn\'t a tossup going on right now')
 
 @bot.command()
 async def ans(ctx):
-    if not ctx.message.channel.id in tossUps:
-        await ctx.send('You have to start a tossup before answering')
-    elif tossUps[ctx.message.channel.id]['currentBuzzer'] != ctx.message.author.id:
-        await ctx.send('You have to buzz before answering!')
+
+    # Check to see if a tossup is actually running right now
+    if ctx.message.channel.id not in tossUps or not tossUps[ctx.message.channel.id]['running']:
+        return await ctx.send('You have to start a tossup before answering')
+    
+    # Also check to see if the right person is answering
+    elif 'currentBuzzer' not in tossUps[ctx.message.channel.id] or tossUps[ctx.message.channel.id]['currentBuzzer'] != ctx.message.author.id:
+        return await ctx.send('You have to buzz before answering!')
+
+    # Get the answers
+    answers, prompts, before = ansFormat(tossUps[ctx.message.channel.id]['fullanswer'])
+    print(answers)
+    # If there is no actual andwer, exit 
+    if '-' not in ctx.message.content:
+        return await ctx.send('Use the correct format of qb ans -your_answer')
+
+    # Check their answer
+
+    # If it was correct
+    if min([diff(ctx.message.content[ctx.message.content.find('-')+1:], i) for i in answers]) <= 2:
+        
+        # Send a correct message and complete the question
+        await ctx.send('That is correct!')
+    
+        #THIS IS WRONG FIX IT, NEED TO ADD BUZZER AND THEN COMPLETE THE QUESTION
+        await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+''.join([tossUps[ctx.message.channel.id]['fullquestion'][i]+' ' for i in range(tossUps[ctx.message.channel.id]['counter'], len(tossUps[ctx.message.channel.id]['fullquestion']))]))
+
+        # Clear currentbuzzer and set answered to true
+        tossUps[ctx.message.channel.id]['currentBuzzer'] = None
+        tossUps[ctx.message.channel.id]['answered'] = True
+        
+        # Show answer, get rid of the ugly stuff at the end cause nobody cares where the question came from
+        if '&lt;' not in tossUps[ctx.message.channel.id]['fullanswer']:
+            return await ctx.send('The anwer was: '+tossUps[ctx.message.channel.id]['fullanswer'])
+        
+        # Otherwise 
+        return await ctx.send('The anwer was: '+tossUps[ctx.message.channel.id]['fullanswer'][:tossUps[ctx.message.channel.id]['fullanswer'].find('&lt;')-1])
+    
+    # If they got a prompt
+    elif ctx.message.content[ctx.message.content.find('-')+1:] in prompts:
+        return await ctx.send('prompt')
+
+    # If they got an answer that is only correct until something is read, etc
+    elif ctx.message.content[ctx.message.content.find('-')+1:] in before:
+        pass 
+
+    # Incorrect answer
     else:
+        
+        # Put an incorrect buzz mark and send an "incorrect" message
+        await ctx.send('Incorrect!')
+        await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content[:-1]+'🔕') 
+        
+        # Clear currentbuzzer
+        tossUps[ctx.message.channel.id]['currentBuzzer'] = None
+        
+        # Resume the reading
+        tossUps[ctx.message.channel.id]['reading'] = True
+        await read(ctx)
 
-        # Fix this, there are prompts, and this inst acc at all
-
-        if ctx.message.content in tossUps[ctx.message.channel.id]['fullanswer']:
-            await ctx.send('That is correct!')
-            await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['fullquestion'])
-            await ctx.send('The anwer was (this needs to be formatted probably):\t'+tossUps[ctx.message.channel.id]['fullanswer'])
-        else:
-            await ctx.send('Incorrect!')
-            await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+'🔕') 
-            # resume the reading idk how rn
-            await resumeRead(ctx)
-
-async def resumeRead(ctx):
+async def read(ctx):
     while tossUps[ctx.message.channel.id]['reading']:
-        tossUps[ctx.message.channel.id]['counter'] += 1
-        await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['fullquestion'][:int(len(tossUps[ctx.message.channel.id]['fullquestion'])*tossUps[ctx.message.channel.id]['counter']/15)])
-        await asyncio.sleep(1)
 
-@bot.command()
-async def id(ctx):
-    await ctx.send(ctx.message.author.id)
+        # Increment counter
+        tossUps[ctx.message.channel.id]['counter'] += 1
+
+        # If the counter is larger than the number of indicies we have, it means we have finished reading, so we have to stop
+        if tossUps[ctx.message.channel.id]['counter'] >= len(tossUps[ctx.message.channel.id]['fullquestion']):
+            tossUps[ctx.message.channel.id]['reading'] = False
+            tossUps[ctx.message.channel.id]['completed'] = True
+
+        # Otherwise, we keep reading
+        else:
+            # Add on to the question
+            await tossUps[ctx.message.channel.id]['question'].edit(content=tossUps[ctx.message.channel.id]['question'].content+' '+tossUps[ctx.message.channel.id]['fullquestion'][tossUps[ctx.message.channel.id]['counter']])
+
+            # Use a special version of sleep so we can create the effect of being read
+            await asyncio.sleep(2)
+
+    # Check to see if the reading has completed, if it has we need to timeout the question
+    if tossUps[ctx.message.channel.id]['completed']:
+
+        # Give 2 seconds before the timeout
+        await asyncio.sleep(5)
+
+        # The reading now ends with either a correct buzz or a timeout, but we don't want to timeout while someone has buzzed
+        # Therefore we create a loop to constantly check to see if there is a buzzer or if there was a correct buzz, as soon as 
+        # the buzzer has finished (if there is a buzzer) we have the reading timeout, similarly, the reading ends if the buzzer
+        # we are waiting on gets a correct buzz
+        while True:
+            
+            # Check to see if someone is answering
+            if not 'currentBuzzer' in tossUps[ctx.message.channel.id] or not tossUps[ctx.message.channel.id]['currentBuzzer']:
+                
+                # We need to finish the question and give a times up and the answer
+                tossUps[ctx.message.channel.id]['running'] = False
+                # Get rid of the ugly stuff at the end cause nobody cares where the question came from
+                if '&lt;' not in tossUps[ctx.message.channel.id]['fullanswer']:
+                    return await ctx.send('**Time\'s up!** \nThe anwer was: '+tossUps[ctx.message.channel.id]['fullanswer'])
+                
+                # Otherwise 
+                return await ctx.send('**Time\'s up!** \nThe anwer was: '+tossUps[ctx.message.channel.id]['fullanswer'][:tossUps[ctx.message.channel.id]['fullanswer'].find('&lt;')-1])
+
+            # If the answer was already guessed (correctly) just exit
+            elif 'answered' in tossUps[ctx.message.channel.id] and tossUps[ctx.message.channel.id]['answered']:
+                tossUps[ctx.message.channel.id]['running'] = False
+                return 
 
 @bot.command(name='Start_Tournament', help='Starts a tournament (ADMIN ONLY)', aliases=getDifferentNames(startWords, 'tournament'))
 async def tournament(ctx):
@@ -309,7 +377,7 @@ async def hlp(ctx):
 
 @bot.command(name='EVAL', help='For bot tests (CREATOR ONLY)', aliases=['e'])
 async def evaluate(ctx):
-    if str(ctx.message.author.id) == '486703741257383937':
+    if str(ctx.message.author.id) == devId:
         await ctx.send(eval(ctx.message.content[ctx.message.content.find('-')+1:]))
     else:
         await ctx.send('You aren\'t the creator!')

@@ -1,5 +1,8 @@
 import operator
 
+# Dev Id for bot eval fxn
+devId = '486703741257383937'
+
 # Bot prefixes
 prefixes = ['QuizBot ', 'qb ', 'QB ', 'Qb ', 'q?', '?']
 
@@ -12,6 +15,7 @@ def validCategory(category):
             return False
     return True
 
+# JUST REMOVE THIS ITS USELESS
 # Get a bunch of aliases for the different bot commands
 helloWords = ['Hi', 'Howdy']
 tournamentWords = ['Tourney', 'T', 'Game', 'G']
@@ -30,6 +34,15 @@ def getDifferentNames(commandList, command, special=None):
             command.upper(), command.upper()+special, command+special, command.lower()+special]
     else:
         return commandList+[i.lower() for i in commandList]+[i.upper() for i in commandList if i.upper() not in commandList]
+
+# Format answers
+def ansFormat(ans):
+    answers, prompts, befores = [[]]*3
+    if '[' in ans:
+        answers.append(ans[:ans.find('[')-1])
+    else:
+        answers.append(ans[:ans.find('&lt;')-1])
+    return [answers, prompts, befores]
 
 # Load all the questions/answers for all the categories
 questionList = ['literature','science','history','fineArts','religion','mythology','philosophy','socialScience','geography','currentEvents','trash']
